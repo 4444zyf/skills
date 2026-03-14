@@ -1,4 +1,4 @@
-# My Claude Skills
+# My Skills
 
 This repository contains custom skills for Claude Code.
 
