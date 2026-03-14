@@ -2,9 +2,6 @@
 name: github-repo-analyzer
 description: |
   分析 GitHub 开源仓库的源代码，生成结构化的分析报告。
-  当用户提到"分析仓库"、"分析代码"、"code review"、"代码审查"、
-  "分析 GitHub 项目"、"理解代码架构"、"生成代码文档"、"分析开源项目"
-  或需要对代码库进行深入理解时，必须使用此技能。
   支持生成项目架构概览、代码质量分析、核心模块说明等报告，
   并可选同步到 Notion。
 ---
@@ -17,14 +14,14 @@ description: |
 
 ### 第一步：获取仓库地址
 
-询问用户提供 GitHub 仓库地址。格式示例：
+按需询问用户提供 GitHub 仓库地址。格式示例：
 - `https://github.com/user/repo`
 - `github.com/user/repo`
 - `user/repo`
 
 ### 第二步：Clone 仓库
 
-1. 在 `/tmp/github-analysis/` 下创建分析工作目录（使用时间戳命名，如 `analysis-20240314-123045`）
+1. 在现有目录下创建分析工作目录（使用时间戳命名，如 `analysis-20240314-123045`）
 2. 在该目录下创建 `repo/` 子目录用于存放 clone 的代码
 3. 执行 `git clone` 命令将仓库 clone 到 `repo/` 目录
 4. 验证 clone 成功（检查目录非空）
@@ -62,8 +59,9 @@ analysis-20240314-123045/
 ├── reports/                 # 分析报告目录
 │   ├── 01-项目架构概览.md
 │   ├── 02-代码质量分析.md
-│   └── 03-核心模块说明.md
-└── notion-sync.log         # Notion 同步日志（如启用）
+│   ├── 03-核心模块说明.md
+│   └── 04-其他用户要求的主题.md
+└── notion-sync.log         # Notion 同步日志（如果启用notion同步脚本）
 ```
 
 #### 报告内容规范
@@ -101,6 +99,16 @@ Notion API 调用要点：
 - 每个 Markdown 文件作为一个子页面
 - 内容分块（每块不超过 2000 字符）
 - 保持 Markdown 格式
+- 在 Notion 中子页面如下：
+
+```
+仓库简介.md (名字依据仓库名和用户要求总结提炼)
+├── 01-项目架构概览.md
+├── 02-代码质量分析.md
+├── 03-核心模块说明.md
+└──  04-其他用户要求的主题.md
+```
+
 
 ### 第七步：清理（可选）
 
@@ -111,10 +119,10 @@ Notion API 调用要点：
 ## 重要提示
 
 1. **报告存放位置**：分析报告必须放在与 `repo/` 同级的 `reports/` 目录，不要放在仓库内部
-2. **仓库路径**：始终使用 `/tmp/github-analysis/analysis-<timestamp>/` 结构
+2. **仓库路径**：始终使用 `/github-analysis/analysis-<timestamp>/` 结构
 3. **错误处理**：
    - Clone 失败时（网络问题、仓库不存在、权限问题），提示用户并退出
-   - 分析工具不可用时，使用当前 Claude 会话继续分析
+   - 分析工具不可用时，询问用户是否采用当前会话的工具进行分析
    - Notion 同步失败时，记录错误但不中断流程
 4. **大仓库处理**：如果仓库文件数超过 10000，提示用户分析可能需要较长时间
 5. **敏感信息**：分析报告中如发现 API 密钥、密码等敏感信息，提醒用户注意
@@ -126,7 +134,7 @@ Notion API 调用要点：
 ```
 ✅ 仓库分析完成！
 
-📁 分析报告位置：/tmp/github-analysis/analysis-20240314-123045/reports/
+📁 分析报告位置：/github-analysis/analysis-20240314-123045/reports/
 
 📄 生成文件：
    - 01-项目架构概览.md
@@ -163,5 +171,3 @@ command -v codex &> /dev/null && echo "codex: OK" || echo "codex: NOT FOUND"
 # 检查 Notion API 密钥
 [ -f ~/.config/notion/api_key ] && echo "notion: CONFIGURED" || echo "notion: NOT CONFIGURED"
 ```
-
-如果所有外部工具都不可用，使用当前 Claude 会话直接分析。
