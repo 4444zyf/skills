@@ -1,0 +1,80 @@
+{
+  "skill_name": "github-repo-analyzer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我分析这个仓库 https://github.com/anthropics/claude-code，我想了解它的架构设计和代码组织方式",
+      "expected_output": "Clone 仓库，生成项目架构概览、代码质量分析和核心模块说明三个报告",
+      "files": [],
+      "assertions": [
+        {
+          "name": "reports_created",
+          "description": "所有三个报告文件都已创建",
+          "check": "files_exist",
+          "params": {
+            "files": ["01-项目架构概览.md", "02-代码质量分析.md", "03-核心模块说明.md"]
+          }
+        },
+        {
+          "name": "architecture_report_has_content",
+          "description": "架构报告包含实质性内容",
+          "check": "file_contains",
+          "params": {
+            "file": "01-项目架构概览.md",
+            "patterns": ["项目", "架构", "模块", "依赖"]
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "分析 https://github.com/tiangolo/fastapi 的代码质量，重点关注潜在问题和安全漏洞",
+      "expected_output": "生成包含代码质量分析的报告，指出潜在问题和改进建议",
+      "files": [],
+      "assertions": [
+        {
+          "name": "quality_report_exists",
+          "description": "代码质量分析报告已创建",
+          "check": "file_exists",
+          "params": {
+            "file": "02-代码质量分析.md"
+          }
+        },
+        {
+          "name": "quality_report_has_issues",
+          "description": "报告包含问题分析",
+          "check": "file_contains",
+          "params": {
+            "file": "02-代码质量分析.md",
+            "patterns": ["问题", "改进", "建议", "优化"]
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "请对 github.com/python/cpython 做代码审查，主要关注核心模块的实现",
+      "expected_output": "生成核心模块说明报告，详细分析关键模块的实现",
+      "files": [],
+      "assertions": [
+        {
+          "name": "module_report_exists",
+          "description": "核心模块说明报告已创建",
+          "check": "file_exists",
+          "params": {
+            "file": "03-核心模块说明.md"
+          }
+        },
+        {
+          "name": "module_report_detailed",
+          "description": "报告详细说明了核心模块",
+          "check": "file_contains",
+          "params": {
+            "file": "03-核心模块说明.md",
+            "patterns": ["模块", "功能", "实现", "核心"]
+          }
+        }
+      ]
+    }
+  ]
+}
