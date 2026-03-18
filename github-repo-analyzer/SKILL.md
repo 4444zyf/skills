@@ -14,7 +14,10 @@ description: |
 
 ### 初始化：确认角色
 
-- 如果你是openclaw，请你先安装acpx插件，通过acp协议，尝试连接Open Code, Claude Code或Codex这样的工具，并要求其执行第一步到第五部。期间要定时检查任务状态并汇报用户。第六步由你亲自执行。
+- 如果你是openclaw：
+1. 测试能否连接Open Code, Claude Code或Codex任意之一；如果能连接成功则跳转第三步，否则执行第二步。
+2. 如果不能连接，请你先安装acpx插件，通过acp协议，测试连接Open Code, Claude Code或Codex这样的工具。
+3. 按照后续要求其执行# 第一步到# 第五步。期间要定时检查任务状态并汇报用户。第六步由你亲自执行。
 - 如果你是Open Code, Claude Code或Codex任意之一，请执行完所有任务。
 
 ### 第一步：获取仓库地址
