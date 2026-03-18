@@ -104,24 +104,60 @@ analysis-20240314-123045/
 - ✅ 递归目录上传（保持层级结构）
 - ✅ 分块上传（支持超过 100 个 blocks 的大文件）
 - ✅ 完整的 Markdown 格式支持（代码块、标题、列表、引用等）
+- ✅ **查询可用页面**（`list` 命令）
+- ✅ **获取页面详细信息**（`info` 命令）
 
 **使用方法**:
 
 ```bash
 # 基本语法
-python3 scripts/notion_sync.py <path> <parent_page_id> [title]
+python3 scripts/notion_sync.py <command> [options]
 
-# 1. 上传单个文件
-python3 scripts/notion_sync.py reports/01-架构.md 12345678-1234-1234-1234-123456789abc
+# 列出所有可用页面
+python3 scripts/notion_sync.py list
 
-# 2. 上传单个文件并指定标题
-python3 scripts/notion_sync.py reports/01-架构.md 12345678-... "项目架构说明"
+# 搜索特定页面
+python3 scripts/notion_sync.py list "My Project"
 
-# 3. 上传整个目录（会创建目录父页面，子内容作为子页面）
-python3 scripts/notion_sync.py reports/ 12345678-... "仓库分析报告"
+# 获取页面详细信息
+python3 scripts/notion_sync.py info <page_id>
 
-# 4. 目录上传时指定父页面标题
-python3 scripts/notion_sync.py reports/ 12345678-... "My Analysis Reports"
+# 上传文件或目录
+python3 scripts/notion_sync.py upload <path> <parent_page_id> [title]
+```
+
+**命令说明**:
+
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `list` | 列出所有可用的父页面 | `python3 notion_sync.py list` |
+| `list <query>` | 搜索特定页面 | `python3 notion_sync.py list "Reports"` |
+| `info <page_id>` | 获取页面详细信息 | `python3 notion_sync.py info abc123...` |
+| `upload <path> <page_id>` | 上传 Markdown 文件或目录 | `python3 notion_sync.py upload report.md abc123...` |
+
+**示例**：
+
+```bash
+# 1. 列出所有可用页面
+python3 scripts/notion_sync.py list
+
+# 2. 搜索特定页面
+python3 scripts/notion_sync.py list "My Project"
+
+# 3. 获取页面详细信息
+python3 scripts/notion_sync.py info 12345678-1234-1234-1234-123456789abc
+
+# 4. 上传单个文件
+python3 scripts/notion_sync.py upload reports/01-架构.md 12345678-1234-1234-1234-123456789abc
+
+# 5. 上传单个文件并指定标题
+python3 scripts/notion_sync.py upload reports/01-架构.md 12345678-... "项目架构说明"
+
+# 6. 上传整个目录（会创建目录父页面，子内容作为子页面）
+python3 scripts/notion_sync.py upload reports/ 12345678-... "仓库分析报告"
+
+# 7. 目录上传时指定父页面标题
+python3 scripts/notion_sync.py upload reports/ 12345678-... "My Analysis Reports"
 ```
 
 **参数说明**:
@@ -206,6 +242,9 @@ Notion API 限制每次最多 100 个 blocks。对于大文件，脚本会自动
 }
 ```
 
+**技术细节**：
+如需了解脚本架构、核心函数说明和扩展开发指南，参见 [`references/notion-sync.md`](references/notion-sync.md)。
+
 ### 第七步：清理（可选）
 
 询问用户是否删除 clone 的仓库：
@@ -246,87 +285,6 @@ Notion API 限制每次最多 100 个 blocks。对于大文件，脚本会自动
 
 ❓ 是否删除 clone 的仓库？(y/n)
 ```
-
-## Notion 同步脚本技术细节
-
-### 脚本架构
-
-```
-scripts/notion_sync.py
-├── 配置常量 (NOTION_API_BASE, NOTION_VERSION, MAX_BLOCKS_PER_REQUEST)
-├── get_notion_api_key()           # 读取 API Key
-├── markdown_to_notion_blocks()    # Markdown 解析器
-├── create_notion_page()           # 创建空页面
-├── append_blocks_to_page()        # 追加 blocks
-├── upload_markdown_to_page()      # 上传单个文件（含分块逻辑）
-├── process_directory()            # 递归处理目录
-└── sync_markdown_to_notion()      # 主入口函数
-```
-
-### 核心函数说明
-
-#### `markdown_to_notion_blocks(content: str) -> List[Dict]`
-
-将 Markdown 文本转换为 Notion Block 对象列表。
-
-**状态机设计**：使用状态机处理代码块，确保多行代码块被正确识别。
-
-```python
-# 代码块处理逻辑
-if line.startswith('```'):
-    if not in_code_block:
-        in_code_block = True  # 开始代码块
-        code_language = extract_language(line)
-    else:
-        in_code_block = False  # 结束代码块
-        blocks.append(create_code_block(...))
-```
-
-#### `upload_markdown_to_page(api_key, parent_page_id, title, content)`
-
-支持大文件分块上传：
-
-```python
-# 1. 创建空页面
-page = create_notion_page(api_key, parent_page_id, title)
-page_id = page.get("id")
-
-# 2. 转换 Markdown
-blocks = markdown_to_notion_blocks(content)
-
-# 3. 分块上传
-for i in range(0, len(blocks), MAX_BLOCKS_PER_REQUEST):
-    chunk = blocks[i:i + MAX_BLOCKS_PER_REQUEST]
-    append_blocks_to_page(api_key, page_id, chunk)
-```
-
-#### `process_directory(api_key, dir_path, parent_page_id, results, custom_title)`
-
-递归处理目录的核心逻辑：
-
-1. 为当前目录创建父页面
-2. 遍历目录下所有条目
-3. 对于 Markdown 文件：创建子页面并上传内容
-4. 对于子目录：递归调用 `process_directory()`
-5. 跳过隐藏文件/目录（以 `.` 开头）
-
-### 扩展开发
-
-如需添加新的 Markdown 格式支持，修改 `markdown_to_notion_blocks()`：
-
-```python
-# 示例：添加表格支持
-elif is_table_line(line):
-    table_block = parse_table(lines[i:])
-    blocks.append(table_block)
-    i += table_block['table']['table_width']
-```
-
-### 依赖要求
-
-- Python 3.7+
-- 标准库：`os`, `sys`, `json`, `re`, `pathlib`, `typing`, `urllib`
-- 无需第三方依赖
 
 ---
 

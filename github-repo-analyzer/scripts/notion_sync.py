@@ -40,6 +40,127 @@ def get_notion_api_key() -> Optional[str]:
     return None
 
 
+def make_notion_api_request(api_key: str, endpoint: str, method: str = "GET",
+                            data: Optional[Dict] = None) -> Dict[str, Any]:
+    """发送 Notion API 请求"""
+    import urllib.request
+    import urllib.error
+
+    url = f"{NOTION_API_BASE}{endpoint}"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Notion-Version": NOTION_VERSION
+    }
+
+    req_data = json.dumps(data).encode('utf-8') if data else None
+
+    req = urllib.request.Request(
+        url,
+        data=req_data,
+        headers=headers,
+        method=method
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8')
+        raise Exception(f"Notion API error: {error_body}")
+
+
+def search_notion_pages(api_key: str, query: str = "", page_size: int = 100) -> Dict[str, Any]:
+    """
+    搜索 Notion 页面
+
+    Args:
+        api_key: Notion API Key
+        query: 搜索关键词（可选）
+        page_size: 返回结果数量（最大 100）
+
+    Returns:
+        搜索结果，包含页面列表
+    """
+    data = {
+        "query": query,
+        "filter": {
+            "value": "page",
+            "property": "object"
+        },
+        "page_size": min(page_size, 100)
+    }
+
+    return make_notion_api_request(api_key, "/search", method="POST", data=data)
+
+
+def get_page_info(api_key: str, page_id: str) -> Dict[str, Any]:
+    """
+    获取特定页面的详细信息
+
+    Args:
+        api_key: Notion API Key
+        page_id: 页面 ID
+
+    Returns:
+        页面详细信息
+    """
+    return make_notion_api_request(api_key, f"/pages/{page_id}", method="GET")
+
+
+def list_available_pages(api_key: str, query: str = "") -> Dict[str, Any]:
+    """
+    列出所有可用的父页面（可作为上传目标的页面）
+
+    Args:
+        api_key: Notion API Key
+        query: 可选的搜索关键词
+
+    Returns:
+        包含页面列表的结果字典
+    """
+    results = {
+        "success": True,
+        "pages": [],
+        "total": 0,
+        "error": None
+    }
+
+    try:
+        response = search_notion_pages(api_key, query)
+        pages = response.get("results", [])
+
+        for page in pages:
+            page_info = {
+                "id": page.get("id"),
+                "title": "",
+                "url": page.get("url"),
+                "created_time": page.get("created_time"),
+                "last_edited_time": page.get("last_edited_time"),
+                "archived": page.get("archived", False)
+            }
+
+            # 提取页面标题
+            properties = page.get("properties", {})
+            if "title" in properties:
+                title_data = properties["title"]
+                if "title" in title_data:
+                    title_parts = [t.get("text", {}).get("content", "")
+                                   for t in title_data["title"]]
+                    page_info["title"] = "".join(title_parts)
+
+            results["pages"].append(page_info)
+
+        results["total"] = len(results["pages"])
+
+    except Exception as e:
+        results["success"] = False
+        results["error"] = str(e)
+
+    return results
+
+
 def markdown_to_notion_blocks(content: str) -> List[Dict[str, Any]]:
     """将 Markdown 转换为 Notion block 格式，支持多行代码块"""
     blocks = []
@@ -443,31 +564,129 @@ def sync_markdown_to_notion(
 
 def main():
     """命令行入口"""
-    if len(sys.argv) < 3:
-        print("Usage: notion_sync.py <markdown_file_or_directory> <parent_page_id> [title]")
+    if len(sys.argv) < 2:
+        print("Usage: notion_sync.py <command> [options]")
+        print("\nCommands:")
+        print("  upload <path> <parent_page_id> [title]  上传 Markdown 到 Notion")
+        print("  list [query]                            列出可用的父页面")
+        print("  info <page_id>                          获取页面详细信息")
         print("\nExamples:")
-        print("  # 上传单个文件")
-        print("  python3 notion_sync.py report.md 12345678-1234-1234-1234-123456789abc")
+        print("  # 列出所有可用页面")
+        print("  python3 notion_sync.py list")
+        print("\n  # 搜索特定页面")
+        print("  python3 notion_sync.py list \"My Project\"")
+        print("\n  # 获取页面详细信息")
+        print("  python3 notion_sync.py info 12345678-1234-1234-1234-123456789abc")
+        print("\n  # 上传单个文件")
+        print("  python3 notion_sync.py upload report.md 12345678-1234-1234-1234-123456789abc")
         print("\n  # 上传单个文件并指定标题")
-        print("  python3 notion_sync.py report.md 12345678-1234-1234-1234-123456789abc 'My Report'")
+        print("  python3 notion_sync.py upload report.md 12345678-... 'My Report'")
         print("\n  # 上传整个目录（会创建目录父页面，子内容作为子页面）")
-        print("  python3 notion_sync.py ./reports/ 12345678-1234-1234-1234-123456789abc 'Analysis Reports'")
-        print("\n目录上传说明:")
-        print("  - 目录上传会递归处理所有子目录")
-        print("  - 每个目录会创建一个父页面")
-        print("  - Markdown 文件作为对应目录的子页面")
-        print("  - 支持嵌套目录结构")
+        print("  python3 notion_sync.py upload ./reports/ 12345678-... 'Analysis Reports'")
         sys.exit(1)
 
-    path = sys.argv[1]
-    parent_page_id = sys.argv[2]
-    title = sys.argv[3] if len(sys.argv) > 3 else None
+    command = sys.argv[1]
 
-    result = sync_markdown_to_notion(path, parent_page_id, title)
+    # 处理 list 命令
+    if command == "list":
+        api_key = get_notion_api_key()
+        if not api_key:
+            print(json.dumps({
+                "success": False,
+                "error": "Notion API key not found in ~/.config/notion/api_key"
+            }, indent=2, ensure_ascii=False))
+            sys.exit(1)
 
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+        query = sys.argv[2] if len(sys.argv) > 2 else ""
+        result = list_available_pages(api_key, query)
 
-    sys.exit(0 if result["success"] else 1)
+        # 格式化输出
+        if result["success"]:
+            print(f"\n找到 {result['total']} 个页面:\n")
+            print(f"{'序号':<6}{'页面标题':<40}{'页面 ID':<40}{'URL':<30}")
+            print("-" * 120)
+            for idx, page in enumerate(result["pages"], 1):
+                title = page["title"][:38] if page["title"] else "(无标题)"
+                page_id = page["id"]
+                url = page["url"][:28] if page["url"] else ""
+                print(f"{idx:<6}{title:<40}{page_id:<40}{url:<30}")
+            print("\n提示: 使用页面 ID 作为 parent_page_id 进行上传")
+        else:
+            print(f"错误: {result['error']}")
+            sys.exit(1)
+
+        sys.exit(0)
+
+    # 处理 info 命令
+    if command == "info":
+        if len(sys.argv) < 3:
+            print("Usage: notion_sync.py info <page_id>")
+            print("\nExample:")
+            print("  python3 notion_sync.py info 12345678-1234-1234-1234-123456789abc")
+            sys.exit(1)
+
+        api_key = get_notion_api_key()
+        if not api_key:
+            print(json.dumps({
+                "success": False,
+                "error": "Notion API key not found in ~/.config/notion/api_key"
+            }, indent=2, ensure_ascii=False))
+            sys.exit(1)
+
+        page_id = sys.argv[2]
+        try:
+            page_info = get_page_info(api_key, page_id)
+            print(json.dumps(page_info, indent=2, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({
+                "success": False,
+                "error": str(e)
+            }, indent=2, ensure_ascii=False))
+            sys.exit(1)
+
+        sys.exit(0)
+
+    # 处理 upload 命令
+    if command == "upload":
+        if len(sys.argv) < 4:
+            print("Usage: notion_sync.py upload <path> <parent_page_id> [title]")
+            print("\nExample:")
+            print("  python3 notion_sync.py upload report.md 12345678-1234-1234-1234-123456789abc")
+            sys.exit(1)
+
+        path = sys.argv[2]
+        parent_page_id = sys.argv[3]
+        title = sys.argv[4] if len(sys.argv) > 4 else None
+
+        result = sync_markdown_to_notion(path, parent_page_id, title)
+
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+
+        sys.exit(0 if result["success"] else 1)
+
+    # 向后兼容：如果没有指定命令，默认使用 upload（旧版本用法）
+    # 检测旧格式：第二个参数看起来像 page_id (UUID 格式 或包含特定字符)
+    if len(sys.argv) >= 3:
+        potential_page_id = sys.argv[2]
+        # UUID 格式检测: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        # 或者简化的检测：长度较长且包含 - 符号
+        if (len(potential_page_id) >= 20 and '-' in potential_page_id) or \
+           potential_page_id.startswith(("1234", "abcd", "http")):
+            # 旧格式: notion_sync.py <path> <parent_page_id> [title]
+            path = sys.argv[1]
+            parent_page_id = sys.argv[2]
+            title = sys.argv[3] if len(sys.argv) > 3 else None
+
+            result = sync_markdown_to_notion(path, parent_page_id, title)
+
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            sys.exit(0 if result["success"] else 1)
+
+    # 未知命令
+    print(f"未知命令: {command}")
+    print("可用命令: upload, list, info")
+    sys.exit(1)
 
 
 if __name__ == "__main__":
