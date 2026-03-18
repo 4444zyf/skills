@@ -1,0 +1,38 @@
+{
+  "skill_name": "email-sender",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "发送文件夹 ./test-data 到 test@example.com，主题是项目备份",
+      "expected_output": "文件夹被压缩为ZIP格式，通过SMTP发送到指定邮箱",
+      "files": [],
+      "expectations": [
+        "压缩过程正确执行，生成ZIP文件",
+        "邮件主题设置为'项目备份'",
+        "附件包含压缩后的文件夹"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "把 reports 文件夹发邮件给 manager@company.com",
+      "expected_output": "reports文件夹被压缩并通过邮件发送",
+      "files": [],
+      "expectations": [
+        "识别并压缩reports文件夹",
+        "正确发送到manager@company.com",
+        "清理临时ZIP文件"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "备份 my-project 目录并通过邮件发送给备份邮箱 backup@example.com",
+      "expected_output": "my-project目录被打包并发送到备份邮箱",
+      "files": [],
+      "expectations": [
+        "正确处理目录路径",
+        "支持中文邮件主题和正文",
+        "配置首次运行时可交互设置"
+      ]
+    }
+  ]
+}
